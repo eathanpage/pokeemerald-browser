@@ -9,3 +9,9 @@ It builds the following ROM:
 To set up the repository, see [INSTALL.md](INSTALL.md).
 
 For contacts and other pret projects, see [pret.github.io](https://pret.github.io/).
+
+## Browser port
+
+The [`port/`](port/README.md) directory builds the game as a WebAssembly app
+that runs in a web browser: `make -f port/wasm.mk` (needs Emscripten). See
+[port/README.md](port/README.md) for details.

@@ -44,6 +44,10 @@
   let accumulator = 0;
   let saveTimer = null;
 
+  // Exposed for debugging and automated tests.
+  const stats = { frames: 0, frameMs: 0, audioBuffered: 0 };
+  window.emeraldStats = stats;
+
   // ------------------------------------------------------------------------
   // UI helpers
 
@@ -454,8 +458,12 @@
   }
 
   function runFrame(withAudio) {
+    const t0 = performance.now();
     mod._Port_SetKeys(keyboardKeys | touchKeys | gamepadKeys);
     mod._Port_Frame();
+    stats.frames++;
+    stats.frameMs = stats.frameMs * 0.95 + (performance.now() - t0) * 0.05;
+    stats.audioBuffered = Audio.buffered;
     if (withAudio && Audio.ctx) {
       const count = mod._Port_GetAudioSampleCount();
       if (count > 0) {
