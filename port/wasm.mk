@@ -80,7 +80,7 @@ $(WASM_DIR)/src/%.o: src/%.c | gba-build
 	@echo "emcc $<"
 	@$(EMCC) -E $(CPPFLAGS) -MMD -MP -MF $(@:.o=.d) -MT $@ $< | $(PREPROC) -i -g build/assets $< charmap.txt | $(EMCC) $(CFLAGS) -x c -c - -o $@
 
-$(WASM_DIR)/port/%.o: port/src/%.c
+$(WASM_DIR)/port/%.o: port/src/%.c | gba-build
 	@mkdir -p $(@D)
 	@echo "emcc $<"
 	@$(EMCC) $(CPPFLAGS) $(CFLAGS) -MMD -MP -c $< -o $@
