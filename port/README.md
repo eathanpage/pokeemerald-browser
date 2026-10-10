@@ -105,6 +105,10 @@ The real-time clock follows the computer's local time.
   and RL decompression, ArcTan2, affine setup, ...), `flash.c` the save chip,
   and `rtc.c` the clock. The wireless adapter and GameCube link are stubbed
   out as "not connected".
+* **Division.** WebAssembly traps on integer division by zero, where the
+  GBA's division routines return 0 (the Spark animation relies on that).
+  `port/tools/wasm_safe_div.py` rewrites the division instructions of the
+  linked module into calls to the helpers in `port/src/divide.c`.
 * **Function pointer types.** WebAssembly traps when a function is called
   through a pointer of a different type, which ARM doesn't mind. The game
   does this in a few places (e.g. `special` calls every special as
@@ -126,8 +130,10 @@ node port/tools/play.mjs -e "wait 300; press START; wait 400; press START; wait 
 
 It can also save and restore the whole emulator state (`snap`/`load`),
 print the game state (`dump`), load a save file (`FLASH=file.sav`), start a
-test battle (`battle SPECIES LEVEL`), and with `WATCHDOG=seconds` print the
-call stack if the game stops returning from a frame.
+test battle (`battle SPECIES LEVEL [MOVE]`), run every move's battle
+animation from an overworld snapshot (`movetest SNAPSHOT FIRST LAST`), and
+with `WATCHDOG=seconds` print the call stack if the game stops completing
+frames.
 
 ## Limitations
 

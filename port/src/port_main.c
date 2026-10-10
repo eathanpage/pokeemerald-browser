@@ -21,6 +21,7 @@
 #include "constants/species.h"
 #include "constants/items.h"
 #include "constants/moves.h"
+#include "event_data.h"
 #include "pokemon.h"
 #include "battle.h"
 
@@ -246,7 +247,11 @@ EMSCRIPTEN_KEEPALIVE void Port_TestWildBattle(u16 species, u8 level, u16 move)
     int i;
 
     if (gPlayerPartyCount == 0)
+    {
         ScriptGiveMon(SPECIES_MUDKIP, 50, ITEM_NONE, 0, 0, 0);
+        FlagSet(FLAG_SYS_POKEMON_GET);
+        FlagSet(FLAG_SYS_POKEDEX_GET);
+    }
     CreateScriptedWildMon(species, level, ITEM_NONE);
     if (move != MOVE_NONE)
     {
