@@ -13,6 +13,7 @@ void AgbMainLoop(void);
 
 static bool8 sStarted;
 static u16 sKeys;
+static u32 sBusyPolls;
 
 // Order in which crt0's IntrMain checks the interrupt flags; the position is
 // the index into gIntrTable.
@@ -88,10 +89,17 @@ static void UpdateTimers(void)
     }
 }
 
+void Port_BusyWait(void)
+{
+    if (++sBusyPolls >= 64)
+        Port_RunVideoFrame();
+}
+
 void Port_RunVideoFrame(void)
 {
     int line;
 
+    sBusyPolls = 0;
     Ppu_StartFrame();
 
     for (line = 0; line < LINES_PER_FRAME; line++)
@@ -147,6 +155,7 @@ EMSCRIPTEN_KEEPALIVE void Port_SetKeys(u16 keys)
 EMSCRIPTEN_KEEPALIVE void Port_Frame(void)
 {
     REG_KEYINPUT = ~sKeys & KEYS_MASK;
+    Audio_BeginFrame();
 
     if (!sStarted)
     {

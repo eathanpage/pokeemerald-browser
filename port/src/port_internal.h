@@ -32,6 +32,7 @@ extern bool8 gPortFlashDirty;
 
 // audio.c
 void Audio_Init(void);
+void Audio_BeginFrame(void);
 void Audio_EndFrame(void);
 
 #endif // GUARD_PORT_INTERNAL_H

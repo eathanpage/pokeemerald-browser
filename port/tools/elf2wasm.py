@@ -17,7 +17,12 @@ LLVM WebAssembly assembly file:
 The raw bytes are written to a side file and pulled in with `.incbin`.
 
 The signatures of the C functions referenced from data are read from the
-compiled wasm objects, since the wasm assembler needs them.
+compiled wasm objects, since the wasm assembler needs them. WebAssembly traps
+when a function is called through a pointer of a different type, which ARM
+doesn't care about (e.g. `special` calls every special as `u16 (*)(void)`,
+including the many `void` ones). The call signature each table is used with
+can be given with --call-sig; references to functions with another signature
+then point to generated adapter functions.
 """
 
 import argparse
@@ -246,12 +251,60 @@ def read_wasm_symbols(path, functions, data_symbols):
 # --------------------------------------------------------------------------
 # Conversion
 
+def parse_sig(sig):
+    params, results = sig.split('->')
+    def types(part):
+        part = part.strip().strip('()').strip()
+        return [t.strip() for t in part.split(',')] if part else []
+    return types(params), types(results)
+
+
+def normalize_sig(sig):
+    params, results = parse_sig(sig)
+    return '(%s) -> (%s)' % (', '.join(params), ', '.join(results))
+
+
+def thunk_asm(thunk, target, call_sig, target_sig):
+    """Assembly for a function with call_sig that calls target (target_sig),
+    passing zero for missing arguments and adapting the return value."""
+    call_params, call_results = parse_sig(call_sig)
+    target_params, target_results = parse_sig(target_sig)
+    for t in call_params + call_results + target_params + target_results:
+        if t != 'i32':
+            raise SystemExit(f'elf2wasm: cannot adapt {target} {target_sig} to {call_sig}')
+    lines = [
+        f'\t.section\t.text.{thunk},"",@',
+        f'\t.type\t{thunk},@function',
+        f'{thunk}:',
+        f'\t.functype\t{thunk} {call_sig}',
+    ]
+    for i in range(len(target_params)):
+        lines.append(f'\tlocal.get\t{i}' if i < len(call_params) else '\ti32.const\t0')
+    lines.append(f'\tcall\t{target}')
+    if target_results and not call_results:
+        lines.append('\tdrop')
+    elif call_results and not target_results:
+        lines.append('\ti32.const\t0')
+    lines.append('\tend_function')
+    lines.append('')
+    return lines
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('-o', '--output', required=True)
     ap.add_argument('--wasm-objs', nargs='*', default=[])
     ap.add_argument('--elf-objs', nargs='*', default=[])
+    ap.add_argument('--call-sig', action='append', default=[], metavar='LOCATION=SIGNATURE',
+                    help='functions referenced from LOCATION (a data label, which covers '
+                         'everything up to the next label, or an object file name) are called '
+                         'with SIGNATURE, e.g. "gSpecials=() -> (i32)"')
     args = ap.parse_args()
+
+    call_sigs = {}
+    for spec in args.call_sig:
+        location, sig = spec.split('=', 1)
+        call_sigs[location.strip()] = normalize_sig(sig)
 
     functions = {}
     wasm_data = set()
@@ -288,7 +341,9 @@ def main():
         name = sec.name.strip('.').replace('.', '_')
         return f'.data.gba.{base}.{name}.{oi}'
 
-    def resolve(oi, obj, sym, addend, where):
+    thunks = {}  # (target, call_sig) -> thunk name
+
+    def resolve(oi, obj, sym, addend, where, call_sig=None):
         """Returns the assembly expression for symbol+addend, or an int for
         absolute values."""
         if sym.type == STT_SECTION:
@@ -308,6 +363,11 @@ def main():
             if addend:
                 errors.append(f'{where}: function {name} referenced with addend {addend}')
             used_functions[name] = functions[name]
+            if call_sig is not None and call_sig != functions[name]:
+                key = (name, call_sig)
+                if key not in thunks:
+                    thunks[key] = f'__port_thunk{len(thunks)}_{name}'
+                return thunks[key]
             return name
         if name in wasm_data:
             undefined_data.add(name)
@@ -346,6 +406,19 @@ def main():
             for a, b in zip(offsets, offsets[1:]):
                 next_off[a] = b
 
+            obj_base = os.path.splitext(os.path.basename(obj.path))[0]
+            # Call signature regions: [start, end) -> signature
+            sig_regions = []
+            for s_ in syms:
+                if s_.name in call_sigs:
+                    sig_regions.append((s_.value, next_off.get(s_.value, sec.size), call_sigs[s_.name]))
+
+            def call_sig_at(off):
+                for start, end, sig in sig_regions:
+                    if start <= off < end:
+                        return sig
+                return call_sigs.get(obj_base)
+
             pos = 0
             blob_base = len(blob)
             blob.extend(data)
@@ -378,7 +451,7 @@ def main():
                     where = f'{obj.path}:{sec.name}+0x{off:x}'
                     if r_type == R_ARM_ABS32:
                         (addend,) = struct.unpack_from('<i', data, off)
-                        val = resolve(oi, obj, sym, addend, where)
+                        val = resolve(oi, obj, sym, addend, where, call_sig_at(off))
                         if isinstance(val, int):
                             emit(f'\t.int32\t{val & 0xFFFFFFFF}')
                         else:
@@ -412,6 +485,10 @@ def main():
     for name in sorted(undefined_data):
         header.append(f'\t.size\t{name}, 0')
     header.append('')
+    for (target, call_sig), thunk in sorted(thunks.items(), key=lambda kv: kv[1]):
+        header.extend(thunk_asm(thunk, target, call_sig, functions[target]))
+    if thunks:
+        print(f'elf2wasm: generated {len(thunks)} call adapters', file=sys.stderr)
 
     with open(bin_path, 'wb') as f:
         f.write(blob)

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#14171c">
+<title>pokeemerald</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="app">
+  <header id="topbar">
+    <h1>pokeemerald <span>browser port</span></h1>
+    <nav id="toolbar" aria-label="Game controls">
+      <button id="btn-mute" type="button" title="Mute (M)">Sound on</button>
+      <input id="volume" type="range" min="0" max="100" value="80" aria-label="Volume">
+      <button id="btn-fast" type="button" title="Toggle fast-forward (hold Space for a burst)">Speed 1×</button>
+      <button id="btn-fullscreen" type="button" title="Fullscreen (F)">Fullscreen</button>
+      <button id="btn-save-menu" type="button" aria-haspopup="true" aria-expanded="false">Save file</button>
+      <button id="btn-help" type="button" aria-haspopup="true" aria-expanded="false">Controls</button>
+    </nav>
+  </header>
+
+  <section id="screen-wrap">
+    <div id="screen">
+      <canvas id="canvas" width="240" height="160" aria-label="Game screen"></canvas>
+      <div id="overlay">
+        <div id="overlay-content">
+          <p id="overlay-title">Loading…</p>
+          <p id="overlay-detail"></p>
+          <div id="progress"><div id="progress-bar"></div></div>
+          <button id="btn-start" type="button" hidden>Start</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="touch" aria-hidden="true">
+    <div class="shoulders">
+      <button class="pad-btn shoulder" data-key="L">L</button>
+      <button class="pad-btn shoulder" data-key="R">R</button>
+    </div>
+    <div class="pad-row">
+      <div class="dpad">
+        <button class="pad-btn up" data-key="UP" aria-label="Up"></button>
+        <button class="pad-btn left" data-key="LEFT" aria-label="Left"></button>
+        <button class="pad-btn right" data-key="RIGHT" aria-label="Right"></button>
+        <button class="pad-btn down" data-key="DOWN" aria-label="Down"></button>
+      </div>
+      <div class="ab">
+        <button class="pad-btn b" data-key="B">B</button>
+        <button class="pad-btn a" data-key="A">A</button>
+      </div>
+    </div>
+    <div class="system">
+      <button class="pad-btn small" data-key="SELECT">Select</button>
+      <button class="pad-btn small" data-key="START">Start</button>
+    </div>
+  </section>
+
+  <div id="save-menu" class="panel" hidden>
+    <h2>Save file</h2>
+    <p>The game saves to this browser automatically whenever you save in-game.
+       You can also move a save between browsers or emulators (128&nbsp;KB <code>.sav</code> flash dump).</p>
+    <div class="panel-actions">
+      <button id="btn-export" type="button">Download .sav</button>
+      <label class="button" for="file-import">Import .sav…</label>
+      <input id="file-import" type="file" accept=".sav,.srm,.fla,application/octet-stream" hidden>
+      <button id="btn-delete" type="button" class="danger">Delete save</button>
+    </div>
+    <button type="button" class="close">Close</button>
+  </div>
+
+  <div id="help" class="panel" hidden>
+    <h2>Controls</h2>
+    <table>
+      <thead><tr><th>GBA</th><th>Keyboard</th><th>Gamepad</th></tr></thead>
+      <tbody>
+        <tr><td>D-Pad</td><td>Arrow keys</td><td>D-pad / left stick</td></tr>
+        <tr><td>A</td><td>X</td><td>East (B / ○)</td></tr>
+        <tr><td>B</td><td>Z</td><td>South (A / ×)</td></tr>
+        <tr><td>L / R</td><td>A / S</td><td>LB / RB</td></tr>
+        <tr><td>Start</td><td>Enter</td><td>Start</td></tr>
+        <tr><td>Select</td><td>Backspace / Shift</td><td>Back / Select</td></tr>
+        <tr><td>Fast-forward</td><td>Hold Space</td><td>RT</td></tr>
+      </tbody>
+    </table>
+    <p>Soft reset: A + B + Start + Select. Touch controls appear on touch screens.</p>
+    <button type="button" class="close">Close</button>
+  </div>
+
+  <p id="status" role="status"></p>
+</main>
+<script src="emerald.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

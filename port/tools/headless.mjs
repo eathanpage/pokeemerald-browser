@@ -57,10 +57,18 @@ if (savePath && fs.existsSync(savePath)) {
 } else {
   mod._Port_InitFlash(0);
 }
+const audioPath = process.env.AUDIO;
+const audioChunks = [];
+if (audioPath) mod._Port_SetAudioRate(48000);
 const t0 = Date.now();
 for (let f = 0; f < frames; f++) {
   for (const [sf, keys] of script) if (sf === f) mod._Port_SetKeys(keys);
   mod._Port_Frame();
+  if (audioPath) {
+    const n = mod._Port_GetAudioSampleCount();
+    const ptr = mod._Port_GetAudioBuffer();
+    audioChunks.push(Float32Array.from(new Float32Array(mod.HEAPU8.buffer, ptr, n * 2)));
+  }
   if ((f + 1) % shotEvery === 0 || f === frames - 1) {
     const ptr = mod._Port_GetFramebuffer();
     const rgba = Buffer.from(mod.HEAPU8.buffer, ptr, 240 * 160 * 4);
@@ -69,5 +77,16 @@ for (let f = 0; f < frames; f++) {
   if (savePath && mod._Port_TakeFlashDirty()) {
     fs.writeFileSync(savePath, Buffer.from(mod.HEAPU8.buffer, flashPtr, mod._Port_GetFlashSize()));
   }
+}
+if (audioPath) {
+  const total = audioChunks.reduce((a, c) => a + c.length, 0);
+  const pcm = Buffer.alloc(total * 2);
+  let o = 0;
+  for (const c of audioChunks) for (const v of c) { pcm.writeInt16LE(Math.max(-32768, Math.min(32767, Math.round(v * 32767))), o); o += 2; }
+  const hdr = Buffer.alloc(44);
+  hdr.write('RIFF', 0); hdr.writeUInt32LE(36 + pcm.length, 4); hdr.write('WAVE', 8); hdr.write('fmt ', 12);
+  hdr.writeUInt32LE(16, 16); hdr.writeUInt16LE(1, 20); hdr.writeUInt16LE(2, 22); hdr.writeUInt32LE(48000, 24);
+  hdr.writeUInt32LE(48000 * 4, 28); hdr.writeUInt16LE(4, 32); hdr.writeUInt16LE(16, 34); hdr.write('data', 36); hdr.writeUInt32LE(pcm.length, 40);
+  fs.writeFileSync(audioPath, Buffer.concat([hdr, pcm]));
 }
 console.log(`${frames} frames in ${Date.now() - t0} ms`);

@@ -45,6 +45,17 @@ static void UNUSED UnusedDummyFunc(void)
 {
 }
 
+#ifdef PORT_WASM
+static void DummyCgbOscOff(u8 chanNum)
+{
+}
+
+static u32 DummyMidiKeyToCgbFreq(u8 chanNum, u8 key, u8 fineAdjust)
+{
+    return 0;
+}
+#endif
+
 void MPlayContinue(struct MusicPlayerInfo *mplayInfo)
 {
     if (mplayInfo->ident == ID_NUMBER)
@@ -384,8 +395,14 @@ void SoundInit(struct SoundInfo *soundInfo)
     soundInfo->masterVolume = 15;
     soundInfo->plynote = ply_note;
     soundInfo->CgbSound = DummyFunc;
+#ifdef PORT_WASM
+    // WebAssembly traps on calls through mismatched function pointer types.
+    soundInfo->CgbOscOff = DummyCgbOscOff;
+    soundInfo->MidiKeyToCgbFreq = DummyMidiKeyToCgbFreq;
+#else
     soundInfo->CgbOscOff = (CgbOscOffFunc)DummyFunc;
     soundInfo->MidiKeyToCgbFreq = (MidiKeyToCgbFreqFunc)DummyFunc;
+#endif
     soundInfo->ExtVolPit = (ExtVolPitFunc)DummyFunc;
 
     MPlayJumpTableCopy(gMPlayJumpTable);

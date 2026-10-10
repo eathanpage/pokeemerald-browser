@@ -451,6 +451,10 @@ bool8 IsDma3ManagerBusyWithBgCopy(void)
             s8 reqSpace = CheckForSpaceForDma3Request(i);
             if (reqSpace == -1)
             {
+#ifdef PORT_WASM
+                // Lets a frame pass if this is polled in a loop.
+                Port_BusyWait();
+#endif
                 return TRUE;
             }
 
@@ -1238,7 +1242,12 @@ bool32 IsInvalidBg32(u8 bg)
 
 bool32 IsTileMapOutsideWram(u8 bg)
 {
+#ifdef PORT_WASM
+    // Tilemap buffers are ordinary heap/static memory in the port.
+    if (FALSE)
+#else
     if (sGpuBgConfigs2[bg].tilemap > (void *)IWRAM_END)
+#endif
         return TRUE;
     else if (sGpuBgConfigs2[bg].tilemap == NULL)
         return TRUE;

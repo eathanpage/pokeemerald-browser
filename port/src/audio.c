@@ -10,7 +10,7 @@
 #include "gba/m4a_internal.h"
 
 #define FRAMES_PER_SECOND (16777216.0 / CYCLES_PER_FRAME) // ~59.7275
-#define MAX_OUT_SAMPLES 4096
+#define MAX_OUT_SAMPLES 16384
 
 extern s8 *gPortPcmChunk;
 extern u32 gPortPcmChunkSize;
@@ -303,6 +303,11 @@ static float SampleNoise(void)
     return acc * sNoise.env.volume * 0.5f;
 }
 
+void Audio_BeginFrame(void)
+{
+    sOutCount = 0;
+}
+
 void Audio_EndFrame(void)
 {
     u16 soundcntH = REG_SOUNDCNT_H;
@@ -319,8 +324,9 @@ void Audio_EndFrame(void)
     sSamplesOwed += sOutputRate / FRAMES_PER_SECOND;
     n = (u32)sSamplesOwed;
     sSamplesOwed -= n;
-    if (n > MAX_OUT_SAMPLES)
-        n = MAX_OUT_SAMPLES;
+    // Several video frames can run during one Port_Frame (see Port_BusyWait).
+    if (sOutCount + n > MAX_OUT_SAMPLES)
+        n = MAX_OUT_SAMPLES - sOutCount;
 
     switch (soundcntH & 3)
     {
@@ -403,10 +409,10 @@ void Audio_EndFrame(void)
         if (left < -1.0f) left = -1.0f;
         if (right > 1.0f) right = 1.0f;
         if (right < -1.0f) right = -1.0f;
-        sOutBuffer[i * 2] = left;
-        sOutBuffer[i * 2 + 1] = right;
+        sOutBuffer[(sOutCount + i) * 2] = left;
+        sOutBuffer[(sOutCount + i) * 2 + 1] = right;
     }
-    sOutCount = n;
+    sOutCount += n;
 
     gPortPcmChunk = NULL;
     gPortPcmChunkSize = 0;
