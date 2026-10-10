@@ -20,3 +20,4 @@ _Port_DivS64
 _Port_DivU64
 _Port_RemS64
 _Port_RemU64
+_Port_TestBattleTransition

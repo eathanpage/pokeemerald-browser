@@ -150,6 +150,9 @@ async function exec(line) {
       console.log(`movetest done, ${failures} failures`);
       break;
     }
+    case 'transition':
+      mod._Port_TestBattleTransition(parseInt(parts[1]));
+      break;
     case 'dump':
       mod._Port_DebugDump();
       break;

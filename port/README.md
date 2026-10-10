@@ -131,7 +131,8 @@ node port/tools/play.mjs -e "wait 300; press START; wait 400; press START; wait 
 
 It can also save and restore the whole emulator state (`snap`/`load`),
 print the game state (`dump`), load a save file (`FLASH=file.sav`), start a
-test battle (`battle SPECIES LEVEL [MOVE]`), run every move's battle
+test battle (`battle SPECIES LEVEL [MOVE]`) or battle transition
+(`transition ID`), run every move's battle
 animation from an overworld snapshot (`movetest SNAPSHOT FIRST LAST`), and
 with `WATCHDOG=seconds` print the call stack if the game stops completing
 frames.

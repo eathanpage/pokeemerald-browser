@@ -22,6 +22,7 @@
 #include "constants/items.h"
 #include "constants/moves.h"
 #include "event_data.h"
+#include "battle_transition.h"
 #include "pokemon.h"
 #include "battle.h"
 
@@ -267,4 +268,11 @@ EMSCRIPTEN_KEEPALIVE void Port_TestWildBattle(u16 species, u8 level, u16 move)
         }
     }
     BattleSetup_StartScriptedWildBattle();
+}
+
+// Test hook: runs a battle transition effect on the overworld.
+EMSCRIPTEN_KEEPALIVE void Port_TestBattleTransition(u8 transitionId)
+{
+    LockPlayerFieldControls();
+    BattleTransition_StartOnField(transitionId);
 }
