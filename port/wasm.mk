@@ -105,10 +105,11 @@ $(WASM_DIR)/data/gba_data.s: port/tools/elf2wasm.py $(ARM_DATA_OBJS) $(GAME_OBJS
 $(WASM_DIR)/data/gba_data.o: $(WASM_DIR)/data/gba_data.s
 	$(EMCC) -c $< -o $@
 
-$(DIST_DIR)/emerald.js: $(GAME_OBJS) $(PORT_OBJS) $(DATA_OBJS) port/exports.txt
+$(DIST_DIR)/emerald.js: $(GAME_OBJS) $(PORT_OBJS) $(DATA_OBJS) port/exports.txt port/tools/wasm_safe_div.py
 	@mkdir -p $(@D)
 	@echo "link $@"
 	@$(EMCC) $(LDFLAGS) -o $@ $(GAME_OBJS) $(PORT_OBJS) $(DATA_OBJS)
+	@$(PYTHON) port/tools/wasm_safe_div.py $(DIST_DIR)/emerald.wasm
 
 -include $(GAME_OBJS:.o=.d) $(PORT_OBJS:.o=.d)
 

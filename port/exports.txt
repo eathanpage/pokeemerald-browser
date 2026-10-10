@@ -12,3 +12,11 @@ _Port_GetAudioBuffer
 _Port_GetAudioSampleCount
 _Port_DebugDump
 _Port_TestWildBattle
+_Port_DivS32
+_Port_DivU32
+_Port_RemS32
+_Port_RemU32
+_Port_DivS64
+_Port_DivU64
+_Port_RemS64
+_Port_RemU64

@@ -20,6 +20,9 @@
 #include "script_pokemon_util.h"
 #include "constants/species.h"
 #include "constants/items.h"
+#include "constants/moves.h"
+#include "pokemon.h"
+#include "battle.h"
 
 extern IntrFunc gIntrTable[];
 void AgbMainLoop(void);
@@ -238,10 +241,25 @@ EMSCRIPTEN_KEEPALIVE void Port_DebugDump(void)
 
 // Test hook: starts a wild battle from the overworld (gives the player a
 // Pokemon first if the party is empty).
-EMSCRIPTEN_KEEPALIVE void Port_TestWildBattle(u16 species, u8 level)
+EMSCRIPTEN_KEEPALIVE void Port_TestWildBattle(u16 species, u8 level, u16 move)
 {
+    int i;
+
     if (gPlayerPartyCount == 0)
-        ScriptGiveMon(SPECIES_MUDKIP, 7, ITEM_NONE, 0, 0, 0);
+        ScriptGiveMon(SPECIES_MUDKIP, 50, ITEM_NONE, 0, 0, 0);
     CreateScriptedWildMon(species, level, ITEM_NONE);
+    if (move != MOVE_NONE)
+    {
+        // Both sides only know `move`, to exercise its animation.
+        for (i = 0; i < MAX_MON_MOVES; i++)
+        {
+            u16 m = (i == 0) ? move : MOVE_NONE;
+            u8 pp = (i == 0) ? gBattleMoves[move].pp : 0;
+            SetMonData(&gPlayerParty[0], MON_DATA_MOVE1 + i, &m);
+            SetMonData(&gPlayerParty[0], MON_DATA_PP1 + i, &pp);
+            SetMonData(&gEnemyParty[0], MON_DATA_MOVE1 + i, &m);
+            SetMonData(&gEnemyParty[0], MON_DATA_PP1 + i, &pp);
+        }
+    }
     BattleSetup_StartScriptedWildBattle();
 }

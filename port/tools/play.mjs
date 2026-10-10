@@ -47,9 +47,11 @@ function png(rgba, w, h) {
 }
 
 // WATCHDOG=<seconds>: if the game hangs, print the stuck call stack and exit.
+const heartbeat = new Int32Array(new SharedArrayBuffer(4));
 if (process.env.WATCHDOG) {
   const { Worker } = await import('node:worker_threads');
-  const worker = new Worker(new URL('./watchdog.cjs', import.meta.url), { workerData: Number(process.env.WATCHDOG) });
+  const worker = new Worker(new URL('./watchdog.cjs', import.meta.url),
+    { workerData: { timeout: Number(process.env.WATCHDOG), heartbeat: heartbeat.buffer } });
   await new Promise((resolve) => worker.once('message', resolve));
   worker.unref();
 }
@@ -73,6 +75,7 @@ function run(n, keys = 0) {
   for (let i = 0; i < n; i++) {
     mod._Port_Frame();
     frame++;
+    Atomics.store(heartbeat, 0, frame);
   }
   mod._Port_SetKeys(0);
 }
@@ -84,7 +87,7 @@ function parseKeys(s) {
   }, 0);
 }
 
-function exec(line) {
+async function exec(line) {
   const parts = line.trim().split(/\s+/);
   const cmd = parts[0];
   switch (cmd) {
@@ -102,7 +105,7 @@ function exec(line) {
       break;
     case 'repeat': {
       const n = parseInt(parts[1]);
-      for (let i = 0; i < n; i++) exec(parts.slice(2).join(' '));
+      for (let i = 0; i < n; i++) await exec(parts.slice(2).join(' '));
       break;
     }
     case 'shot': {
@@ -119,8 +122,34 @@ function exec(line) {
       break;
     }
     case 'battle':
-      mod._Port_TestWildBattle(parseInt(parts[1]), parseInt(parts[2] || '5'));
+      mod._Port_TestWildBattle(parseInt(parts[1]), parseInt(parts[2] || '5'), parseInt(parts[3] || '0'));
       break;
+    case 'movetest': {
+      // movetest SNAPSHOT FIRST LAST [FRAMES]: from an overworld snapshot,
+      // battle with each move and report traps.
+      const snapshot = zlib.gunzipSync(fs.readFileSync(parts[1]));
+      const first = parseInt(parts[2]), last = parseInt(parts[3]);
+      const frames = parseInt(parts[4] || '1500');
+      let failures = 0;
+      for (let move = first; move <= last; move++) {
+        try {
+          mod.HEAPU8.set(snapshot);
+          mod._Port_TestWildBattle(288, 50, move);
+          for (let f = 0; f < frames; f += 12) {
+            run(2, KEYS.A);
+            run(10);
+          }
+        } catch (e) {
+          failures++;
+          console.log(`move ${move}: ${e && e.stack ? e.stack.split('\n').slice(0, 6).join(' | ') : e}`);
+          mod = await createEmerald();
+          mod._Port_InitFlash(0);
+        }
+        if (move % 25 === 0) console.log(`... move ${move}`);
+      }
+      console.log(`movetest done, ${failures} failures`);
+      break;
+    }
     case 'dump':
       mod._Port_DebugDump();
       break;
@@ -137,6 +166,6 @@ function exec(line) {
 const t0 = Date.now();
 for (const line of script.split(/[\n;]/)) {
   if (line.trim().startsWith('#')) continue;
-  exec(line);
+  await exec(line);
 }
 console.log(`${frame} frames in ${Date.now() - t0} ms`);

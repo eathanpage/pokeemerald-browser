@@ -368,8 +368,12 @@ void Audio_EndFrame(void)
             if (nr51 & (0x10 << c))
                 left += ch[c];
         }
-        right *= ((nr50 & 7) + 1) * psgScale;
-        left *= (((nr50 >> 4) & 7) + 1) * psgScale;
+        // Channels are 4-bit (here centered: -7.5..7.5). The GBA scales the
+        // PSG sum by 8 * (NR50 volume + 1) and then by the SOUNDCNT_H ratio,
+        // giving up to 240 per channel on the 10-bit DAC scale where Direct
+        // Sound reaches +-512.
+        right *= ((nr50 & 7) + 1) * psgScale * 2.0f;
+        left *= (((nr50 >> 4) & 7) + 1) * psgScale * 2.0f;
 
         if (chunk != NULL && chunkSize != 0)
         {

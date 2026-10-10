@@ -88,6 +88,11 @@ static s32 DecodeCompressedSample(struct SoundChannel *chan, u32 index)
 {
     u32 block = index >> 6;
 
+    // Reverse playback reads one sample before the start (index -1); the GBA
+    // reads some unrelated memory there.
+    if (index >= chan->wav->size)
+        return 0;
+
     if (block != *ChanXpi(chan))
     {
         const u8 *src = (const u8 *)chan->wav + 0x10 + block * 33;
