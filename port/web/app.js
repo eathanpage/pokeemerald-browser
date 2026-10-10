@@ -43,6 +43,7 @@
   let lastTime = 0;
   let accumulator = 0;
   let saveTimer = null;
+  let paused = false;
 
   // Exposed for debugging and automated tests.
   const stats = { frames: 0, frameMs: 0, audioBuffered: 0 };
@@ -315,6 +316,8 @@
       toggleFullscreen();
     } else if (e.code === 'KeyM' && !e.repeat) {
       toggleMute();
+    } else if (e.code === 'KeyP' && !e.repeat) {
+      setPaused(!paused);
     } else if (e.code === 'Escape') {
       showPanel(null, false);
     }
@@ -480,6 +483,8 @@
     if (flash === undefined) flash = mod ? currentFlash() : await SaveStore.load();
     mod = await createInstance(flash);
     bindFramebuffer();
+    paused = false;
+    $('btn-start').hidden = true;
     overlay.hidden = true;
     accumulator = 0;
     lastTime = performance.now();
@@ -488,7 +493,8 @@
 
   function handleCrash(error) {
     if (error === 'PortSoftReset') {
-      flushSave().then(() => restartGame());
+      running = false;
+      (saveTimer ? flushSave() : Promise.resolve()).then(() => restartGame());
       return;
     }
     running = false;
@@ -506,7 +512,7 @@
   function tick(now) {
     requestAnimationFrame(tick);
     pollGamepads();
-    if (!running) {
+    if (!running || paused) {
       lastTime = now;
       return;
     }
@@ -537,6 +543,24 @@
 
   // ------------------------------------------------------------------------
   // Toolbar
+
+  function setPaused(value) {
+    if (!running || paused === value) return;
+    paused = value;
+    if (paused) {
+      setOverlay('Paused', 'Press P or click Resume to continue.');
+      const btn = $('btn-start');
+      btn.textContent = 'Resume';
+      btn.hidden = false;
+      btn.onclick = () => setPaused(false);
+      keyboardKeys = 0;
+    } else {
+      overlay.hidden = true;
+      $('btn-start').hidden = true;
+      lastTime = performance.now();
+      Audio.start();
+    }
+  }
 
   function toggleMute() {
     Audio.muted = !Audio.muted;
@@ -621,7 +645,12 @@
     });
 
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden' && saveTimer) flushSave();
+      if (document.visibilityState === 'hidden') {
+        if (saveTimer) flushSave();
+        setPaused(true);
+      } else if (Audio.ctx && Audio.ctx.state !== 'running') {
+        Audio.ctx.resume().catch(() => {});
+      }
     });
     window.addEventListener('pagehide', () => {
       if (saveTimer) flushSave();

@@ -52,7 +52,8 @@ and Emscripten assertions into `port/dist-debug/`.
 | Select | Backspace / Shift | Back / Select |
 | Fast-forward | hold Space | RT |
 
-Touch controls appear on touch screens. `F` toggles fullscreen and `M` mutes.
+Touch controls appear on touch screens. `P` pauses (the game also pauses
+when the tab is hidden), `F` toggles fullscreen, and `M` mutes.
 
 The game saves to the browser (IndexedDB) whenever you save in-game. The
 *Save file* menu downloads the save as a 128 KiB `.sav` flash image, imports
