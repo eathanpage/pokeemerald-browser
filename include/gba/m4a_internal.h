@@ -406,12 +406,24 @@ extern const struct ToneData voicegroup_dummy;
 extern char gNumMusicPlayers[];
 extern char gMaxLines[];
 
+#ifdef PORT_WASM
+// These are linker-script symbols on the GBA; wasm has no absolute symbols.
+#define NUM_MUSIC_PLAYERS 4
+#define MAX_LINES 0
+#else
 #define NUM_MUSIC_PLAYERS ((u16)gNumMusicPlayers)
 #define MAX_LINES ((u32)gMaxLines)
+#endif
 
 u32 umul3232H32(u32 multiplier, u32 multiplicand);
 void SoundMain(void);
+#ifdef PORT_WASM
+// Called through the jump table with the address to clear; wasm checks
+// indirect call signatures.
+void SoundMainBTM(void *x);
+#else
 void SoundMainBTM(void);
+#endif
 void TrackStop(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *track);
 void MPlayMain(struct MusicPlayerInfo *);
 void RealClearChain(void *x);

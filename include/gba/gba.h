@@ -4,6 +4,9 @@
 #include "gba/defines.h"
 #include "gba/io_reg.h"
 #include "gba/types.h"
+#ifdef PORT_WASM
+#include "port.h"
+#endif
 #include "gba/multiboot.h"
 #include "gba/syscall.h"
 #include "gba/macro.h"

@@ -102,8 +102,12 @@ bool8 RunScriptCommand(struct ScriptContext *ctx)
 
             if (ctx->scriptPtr == gNullScriptPtr)
             {
+#ifdef PORT_WASM
+                Port_Halt("script engine hit gNullScriptPtr");
+#else
                 while (1)
                     asm("svc 2"); // HALT
+#endif
             }
 
             cmdCode = *(ctx->scriptPtr);

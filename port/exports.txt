@@ -1,0 +1,13 @@
+_main
+_Port_Frame
+_Port_SetKeys
+_Port_GetFramebuffer
+_Port_GetFlash
+_Port_GetFlashSize
+_Port_InitFlash
+_Port_TakeFlashDirty
+_Port_SetAudioRate
+_Port_SetVolume
+_Port_GetAudioBuffer
+_Port_GetAudioSampleCount
+_Port_DebugDump

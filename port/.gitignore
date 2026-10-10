@@ -1,0 +1,5 @@
+# Build output of `make -f port/wasm.mk`
+/dist/
+/dist-debug/
+# The repository ignores *.js globally; the port's frontend scripts are sources.
+!*.js

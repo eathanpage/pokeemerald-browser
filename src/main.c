@@ -128,7 +128,16 @@ void AgbMain(void)
     AGBPrintInit();
 #endif
 #endif
+#ifdef PORT_WASM
+}
+
+// The browser can't block, so the port calls this once per frame instead of
+// AgbMain looping forever.
+void AgbMainLoop(void)
+{
+#else
     for (;;)
+#endif
     {
         ReadKeys();
 
@@ -298,9 +307,11 @@ void InitIntrHandlers(void)
     for (i = 0; i < INTR_COUNT; i++)
         gIntrTable[i] = gIntrTableTemplate[i];
 
+#ifndef PORT_WASM
     DmaCopy32(3, IntrMain, IntrMain_Buffer, sizeof(IntrMain_Buffer));
 
     INTR_VECTOR = IntrMain_Buffer;
+#endif
 
     SetVBlankCallback(NULL);
     SetHBlankCallback(NULL);
@@ -411,8 +422,13 @@ static void WaitForVBlank(void)
 {
     gMain.intrCheck &= ~INTR_FLAG_VBLANK;
 
+#ifdef PORT_WASM
+    // Draws the frame, running the H-Blank/V-Count/V-Blank interrupts.
+    Port_RunVideoFrame();
+#else
     while (!(gMain.intrCheck & INTR_FLAG_VBLANK))
         ;
+#endif
 }
 
 void SetTrainerHillVBlankCounter(u32 *counter)

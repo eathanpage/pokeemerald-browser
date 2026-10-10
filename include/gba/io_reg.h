@@ -1,7 +1,11 @@
 #ifndef GUARD_GBA_IO_REG_H
 #define GUARD_GBA_IO_REG_H
 
+#ifdef PORT_WASM
+#define REG_BASE 0x00090000 // I/O register base address (browser port)
+#else
 #define REG_BASE 0x4000000 // I/O register base address
+#endif
 
 // I/O register offsets
 

@@ -54,6 +54,13 @@
 
 #define CpuFastCopy(src, dest, size) CpuFastSet(src, dest, ((size)/(32/8) & 0x1FFFFF))
 
+#ifdef PORT_WASM
+// The browser port performs DMA transfers in software (see port/src/dma.c).
+void Port_DmaSet(int dmaNum, const void *src, void *dest, u32 control);
+void Port_DmaStop(int dmaNum);
+#define DmaSetUnchecked(dmaNum, src, dest, control) \
+    Port_DmaSet(dmaNum, (const void *)(uintptr_t)(src), (void *)(uintptr_t)(dest), (u32)(control))
+#else
 #define DmaSetUnchecked(dmaNum, src, dest, control) \
 {                                                 \
     vu32 *dmaRegs = (vu32 *)REG_ADDR_DMA##dmaNum; \
@@ -62,6 +69,7 @@
     dmaRegs[2] = (vu32)(control);                 \
     dmaRegs[2];                                   \
 }
+#endif
 
 #if MODERN
 // NOTE: Assumes 16-bit DMAs.
@@ -230,6 +238,9 @@
 #define DmaClear16Defvars(dmaNum, dest, size) DmaClearDefvars(dmaNum, dest, size, 16)
 #define DmaClear32Defvars(dmaNum, dest, size) DmaClearDefvars(dmaNum, dest, size, 32)
 
+#ifdef PORT_WASM
+#define DmaStop(dmaNum) Port_DmaStop(dmaNum)
+#else
 #define DmaStop(dmaNum)                                         \
 {                                                               \
     vu16 *dmaRegs = (vu16 *)REG_ADDR_DMA##dmaNum;               \
@@ -237,6 +248,7 @@
     dmaRegs[5] &= ~DMA_ENABLE;                                  \
     dmaRegs[5];                                                 \
 }
+#endif
 
 #define IntrEnable(flags)                                       \
 {                                                               \

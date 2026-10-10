@@ -420,11 +420,13 @@ void SampleFreqSet(u32 freq)
 
     m4aSoundVSyncOn();
 
+#ifndef PORT_WASM // Nothing advances VCOUNT outside of the port's frame loop.
     while (*(vu8 *)REG_ADDR_VCOUNT == 159)
         ;
 
     while (*(vu8 *)REG_ADDR_VCOUNT != 159)
         ;
+#endif
 
     REG_TM0CNT_H = TIMER_ENABLE | TIMER_1CLK;
 }
