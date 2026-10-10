@@ -52,8 +52,19 @@ and Emscripten assertions into `port/dist-debug/`.
 | Select | Backspace / Shift | Back / Select |
 | Fast-forward | hold Space | RT |
 
-Touch controls appear on touch screens. `P` pauses (the game also pauses
-when the tab is hidden), `F` toggles fullscreen, and `M` mutes.
+`P` pauses (the game also pauses when the tab is hidden), `F` toggles
+fullscreen, and `M` mutes.
+
+### Phones and tablets
+
+On touch screens the page switches to on-screen controls: the screen sits
+above the controls in portrait and between them in landscape. Slide a thumb
+around the D-pad (it keeps steering if the thumb drifts off it); hold » to
+fast-forward. The *Menu* button holds the other options, including
+*Touch controls: auto / on / off* to force the controls on or off on any
+device. Fullscreen keeps the controls visible. On iPhone, where Safari has no
+fullscreen API, *Add to Home Screen* starts the game full screen. The screen
+is kept awake while the game runs.
 
 The game saves to the browser (IndexedDB) whenever you save in-game. The
 *Save file* menu downloads the save as a 128 KiB `.sav` flash image, imports

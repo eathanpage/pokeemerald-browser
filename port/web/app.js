@@ -39,6 +39,7 @@
   let gamepadKeys = 0;
   let fastForwardHeld = false;
   let fastForwardToggle = false;
+  let touchFastForward = false;
   let gamepadFastForward = false;
   let lastTime = 0;
   let accumulator = 0;
@@ -64,7 +65,13 @@
     $('status').textContent = text;
   }
 
+  function setMenuOpen(open) {
+    $('toolbar').classList.toggle('open', open);
+    $('btn-menu').setAttribute('aria-expanded', String(open));
+  }
+
   function showPanel(id, show) {
+    if (show) setMenuOpen(false);
     for (const panel of document.querySelectorAll('.panel')) {
       const visible = panel.id === id && show;
       panel.hidden = !visible;
@@ -357,51 +364,138 @@
     }
   }
 
+  const TOUCH_MODES = ['auto', 'on', 'off'];
+
+  function touchMode() {
+    try {
+      const mode = localStorage.getItem('pokeemerald-touch');
+      if (TOUCH_MODES.includes(mode)) return mode;
+    } catch (e) { /* ignore */ }
+    return 'auto';
+  }
+
+  function applyTouchMode() {
+    const mode = touchMode();
+    const isTouchDevice = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+    const show = mode === 'on' || (mode === 'auto' && isTouchDevice);
+    document.body.classList.toggle('touch', show);
+    $('btn-touch').textContent = `Touch controls: ${mode}`;
+  }
+
+  // The D-pad is a single touch area: the direction comes from the angle of
+  // the touch relative to its center, with narrow diagonal zones. A finger
+  // that started on the D-pad keeps steering it even if it drifts off.
+  function dpadKeys(x, y) {
+    const rect = $('dpad').getBoundingClientRect();
+    const dx = x - (rect.left + rect.width / 2);
+    const dy = y - (rect.top + rect.height / 2);
+    if (Math.hypot(dx, dy) < rect.width * 0.1) return 0;
+    const angle = (Math.atan2(-dy, dx) * 180) / Math.PI; // 0 = right, 90 = up
+    const a = (angle + 360) % 360;
+    const DIAGONAL = 15; // half-width of the diagonal zones, in degrees
+    let keys = 0;
+    if (a < 45 + DIAGONAL || a > 315 - DIAGONAL) keys |= KEY_BITS.RIGHT;
+    if (a > 45 - DIAGONAL && a < 135 + DIAGONAL) keys |= KEY_BITS.UP;
+    if (a > 135 - DIAGONAL && a < 225 + DIAGONAL) keys |= KEY_BITS.LEFT;
+    if (a > 225 - DIAGONAL && a < 315 + DIAGONAL) keys |= KEY_BITS.DOWN;
+    return keys;
+  }
+
   function setupTouch() {
-    const isTouch = window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
-    if (isTouch) document.body.classList.add('touch');
+    applyTouchMode();
+    $('btn-touch').addEventListener('click', () => {
+      const next = TOUCH_MODES[(TOUCH_MODES.indexOf(touchMode()) + 1) % TOUCH_MODES.length];
+      try { localStorage.setItem('pokeemerald-touch', next); } catch (e) { /* ignore */ }
+      applyTouchMode();
+    });
 
-    const buttons = Array.from(document.querySelectorAll('#touch .pad-btn'));
-    const pointers = new Map(); // pointerId -> button
-
-    function update() {
-      touchKeys = 0;
-      for (const btn of buttons) btn.classList.remove('pressed');
-      for (const btn of pointers.values()) {
-        if (!btn) continue;
-        touchKeys |= KEY_BITS[btn.dataset.key];
-        btn.classList.add('pressed');
-      }
-    }
+    const stage = $('stage');
+    const dpad = $('dpad');
+    const buttons = Array.from(document.querySelectorAll('.pad-side .pad-btn'));
+    // pointerId -> { dpad: true } or { button: element or null }
+    const pointers = new Map();
+    let lastKeys = 0;
 
     function buttonAt(x, y) {
       const el = document.elementFromPoint(x, y);
-      return el && el.closest ? el.closest('#touch .pad-btn') : null;
+      return el && el.closest ? el.closest('.pad-side .pad-btn') : null;
     }
 
-    const pad = $('touch');
-    pad.addEventListener('pointerdown', (e) => {
+    function update(e) {
+      let keys = 0;
+      let fast = false;
+      const pressed = new Set();
+      for (const [id, p] of pointers) {
+        if (p.dpad) {
+          if (e && e.pointerId === id) p.keys = dpadKeys(e.clientX, e.clientY);
+          keys |= p.keys;
+        } else if (p.button) {
+          pressed.add(p.button);
+          if (p.button.dataset.action === 'fast') fast = true;
+          else keys |= KEY_BITS[p.button.dataset.key];
+        }
+      }
+      for (const btn of buttons) btn.classList.toggle('pressed', pressed.has(btn));
+      dpad.classList.toggle('p-up', !!(keys & KEY_BITS.UP));
+      dpad.classList.toggle('p-down', !!(keys & KEY_BITS.DOWN));
+      dpad.classList.toggle('p-left', !!(keys & KEY_BITS.LEFT));
+      dpad.classList.toggle('p-right', !!(keys & KEY_BITS.RIGHT));
+      // A short buzz when something new gets pressed (Android only).
+      if ((keys & ~lastKeys) && navigator.vibrate) navigator.vibrate(8);
+      lastKeys = keys;
+      touchKeys = keys;
+      touchFastForward = fast;
+    }
+
+    stage.addEventListener('pointerdown', (e) => {
+      if (!document.body.classList.contains('touch')) return;
+      const onDpad = e.target.closest && e.target.closest('#dpad');
+      const button = buttonAt(e.clientX, e.clientY);
+      if (!onDpad && !button) return;
       e.preventDefault();
-      pointers.set(e.pointerId, buttonAt(e.clientX, e.clientY));
-      if (pad.setPointerCapture) pad.setPointerCapture(e.pointerId);
-      update();
+      pointers.set(e.pointerId, onDpad ? { dpad: true, keys: 0 } : { button });
+      if (stage.setPointerCapture) stage.setPointerCapture(e.pointerId);
+      update(e);
       Audio.start();
-      if (navigator.vibrate) navigator.vibrate(8);
     });
-    pad.addEventListener('pointermove', (e) => {
-      if (!pointers.has(e.pointerId)) return;
-      // Allow sliding a finger between buttons (e.g. around the D-pad).
-      pointers.set(e.pointerId, buttonAt(e.clientX, e.clientY));
-      update();
+    stage.addEventListener('pointermove', (e) => {
+      const p = pointers.get(e.pointerId);
+      if (!p) return;
+      // Sliding onto another button presses that one instead.
+      if (!p.dpad) p.button = buttonAt(e.clientX, e.clientY);
+      update(e);
     });
     const release = (e) => {
-      pointers.delete(e.pointerId);
-      update();
+      if (pointers.delete(e.pointerId)) update();
     };
-    pad.addEventListener('pointerup', release);
-    pad.addEventListener('pointercancel', release);
-    pad.addEventListener('contextmenu', (e) => e.preventDefault());
+    stage.addEventListener('pointerup', release);
+    stage.addEventListener('pointercancel', release);
+    stage.addEventListener('contextmenu', (e) => {
+      if (document.body.classList.contains('touch')) e.preventDefault();
+    });
+    // iOS Safari ignores user-scalable=no; block pinch zoom while playing.
+    document.addEventListener('gesturestart', (e) => e.preventDefault());
+    window.addEventListener('blur', () => {
+      pointers.clear();
+      update();
+    });
   }
+
+  // Keeps the screen from turning off while the game runs.
+  const WakeLock = {
+    lock: null,
+    async acquire() {
+      if (this.lock || !('wakeLock' in navigator) || document.visibilityState !== 'visible') return;
+      try {
+        this.lock = await navigator.wakeLock.request('screen');
+        this.lock.addEventListener('release', () => { this.lock = null; });
+      } catch (e) { /* not allowed right now */ }
+    },
+    release() {
+      if (this.lock) this.lock.release().catch(() => {});
+      this.lock = null;
+    },
+  };
 
   // ------------------------------------------------------------------------
   // Emulation
@@ -521,7 +615,7 @@
     lastTime = now;
     if (dt > 250) dt = FRAME_MS; // the tab was in the background
 
-    const fast = fastForwardHeld || fastForwardToggle || gamepadFastForward;
+    const fast = fastForwardHeld || fastForwardToggle || gamepadFastForward || touchFastForward;
     const speed = fast ? 4 : 1;
     accumulator += dt * speed;
 
@@ -548,7 +642,8 @@
     if (!running || paused === value) return;
     paused = value;
     if (paused) {
-      setOverlay('Paused', 'Press P or click Resume to continue.');
+      WakeLock.release();
+      setOverlay('Paused', 'Press P or tap Resume to continue.');
       const btn = $('btn-start');
       btn.textContent = 'Resume';
       btn.hidden = false;
@@ -559,6 +654,7 @@
       $('btn-start').hidden = true;
       lastTime = performance.now();
       Audio.start();
+      WakeLock.acquire();
     }
   }
 
@@ -569,15 +665,31 @@
   }
 
   function toggleFullscreen() {
-    const el = $('screen');
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
+    // With on-screen controls, the whole page goes fullscreen so they stay.
+    const el = document.body.classList.contains('touch') ? document.documentElement : $('screen');
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
     } else if (el.requestFullscreen) {
-      el.requestFullscreen().catch(() => {});
+      el.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+    } else if (el.webkitRequestFullscreen) {
+      el.webkitRequestFullscreen();
     }
   }
 
   function setupToolbar() {
+    $('btn-menu').addEventListener('click', (e) => {
+      e.stopPropagation();
+      setMenuOpen(!$('toolbar').classList.contains('open'));
+    });
+    document.addEventListener('pointerdown', (e) => {
+      if (!e.target.closest('#toolbar, #btn-menu')) setMenuOpen(false);
+    });
+    $('btn-fullscreen').addEventListener('click', () => setMenuOpen(false));
+    // Browsers without the Fullscreen API (iPhone Safari) go fullscreen when
+    // the page is added to the home screen instead.
+    if (!document.documentElement.requestFullscreen && !document.documentElement.webkitRequestFullscreen)
+      $('btn-fullscreen').hidden = true;
+
     $('btn-mute').addEventListener('click', toggleMute);
     $('volume').addEventListener('input', (e) => {
       Audio.volume = e.target.value / 100;
@@ -694,6 +806,7 @@
       if (Audio.ctx) mod._Port_SetAudioRate(Audio.ctx.sampleRate);
       lastTime = performance.now();
       running = true;
+      WakeLock.acquire();
       canvas.focus();
     };
     startBtn.onclick = begin;
