@@ -7,6 +7,19 @@
 #include "port_internal.h"
 #include "main.h"
 #include "gba/m4a_internal.h"
+#include "event_object_movement.h"
+#include "field_player_avatar.h"
+#include "fieldmap.h"
+#include "script.h"
+#include "sound.h"
+#include "task.h"
+#include "m4a.h"
+#include "gba/m4a_internal.h"
+#include "palette.h"
+#include "battle_setup.h"
+#include "script_pokemon_util.h"
+#include "constants/species.h"
+#include "constants/items.h"
 
 extern IntrFunc gIntrTable[];
 void AgbMainLoop(void);
@@ -180,8 +193,55 @@ int main(void)
     return 0;
 }
 
+static void Port_LogSePlayer(struct MusicPlayerInfo *mp, int song)
+{
+    int t;
+    Port_Log("  SE1 song=%d tracks=%d tempoD=%d tempoI=%d clock=%u", song, mp->trackCount, mp->tempoD, mp->tempoI, mp->clock);
+    for (t = 0; t < mp->trackCount; t++)
+    {
+        struct MusicPlayerTrack *tr = &mp->tracks[t];
+        Port_Log("    track %d flags=%x wait=%d cmdPtr=%p [%02x %02x %02x %02x] chan=%p", t, tr->flags, tr->wait, tr->cmdPtr,
+                 tr->cmdPtr ? tr->cmdPtr[0] : 0, tr->cmdPtr ? tr->cmdPtr[1] : 0, tr->cmdPtr ? tr->cmdPtr[2] : 0, tr->cmdPtr ? tr->cmdPtr[3] : 0, tr->chan);
+    }
+}
+
+// Debugging aid for the test tools.
 EMSCRIPTEN_KEEPALIVE void Port_DebugDump(void)
 {
-    Port_Log("cb1=%p cb2=%p state=%d vblank=%u intrCheck=%x vblankCb=%p",
-             gMain.callback1, gMain.callback2, gMain.state, gMain.vblankCounter1, gMain.intrCheck, gMain.vblankCallback);
+    struct ObjectEvent *player = &gObjectEvents[gPlayerAvatar.objectEventId];
+    Port_Log("cb1=%p cb2=%p state=%d vblank=%u map=%d.%d player=%d,%d facing=%d",
+             gMain.callback1, gMain.callback2, gMain.state, gMain.vblankCounter1,
+             gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum,
+             player->currentCoords.x - MAP_OFFSET, player->currentCoords.y - MAP_OFFSET,
+             player->facingDirection);
+    Port_Log("  player: actionId=%d heldActive=%d heldFinished=%d sprite=%d actionFuncId=%d data3..7=%d %d %d %d %d singleMovementActive=%d",
+             player->movementActionId, player->heldMovementActive, player->heldMovementFinished, player->spriteId,
+             gSprites[player->spriteId].data[2], gSprites[player->spriteId].data[3], gSprites[player->spriteId].data[4],
+             gSprites[player->spriteId].data[5], gSprites[player->spriteId].data[6], gSprites[player->spriteId].data[7],
+             player->singleMovementActive);
+    Port_Log("  fieldLocked=%d scriptEnabled=%d se=%d bgm=%x se1=%x se2=%x heldMovement=%d fade=%d tasks:",
+             ArePlayerFieldControlsLocked(), ScriptContext_IsEnabled(), IsSEPlaying(),
+             gMPlayInfo_BGM.status, gMPlayInfo_SE1.status, gMPlayInfo_SE2.status,
+             player->heldMovementActive, gPaletteFade.active);
+    {
+        int i;
+        struct MusicPlayerInfo *se = &gMPlayInfo_SE1;
+        for (i = 0; i < 1000; i++)
+            if (gSongTable[i].header == se->songHeader)
+                break;
+        Port_LogSePlayer(se, i);
+        for (i = 0; i < NUM_TASKS; i++)
+            if (gTasks[i].isActive)
+                Port_Log("    task %d func=%p data0=%d", i, gTasks[i].func, gTasks[i].data[0]);
+    }
+}
+
+// Test hook: starts a wild battle from the overworld (gives the player a
+// Pokemon first if the party is empty).
+EMSCRIPTEN_KEEPALIVE void Port_TestWildBattle(u16 species, u8 level)
+{
+    if (gPlayerPartyCount == 0)
+        ScriptGiveMon(SPECIES_MUDKIP, 7, ITEM_NONE, 0, 0, 0);
+    CreateScriptedWildMon(species, level, ITEM_NONE);
+    BattleSetup_StartScriptedWildBattle();
 }

@@ -60,7 +60,12 @@ const outdir = (arg === '-e' ? process.argv[4] : process.argv[3]) || 'shots';
 fs.mkdirSync(outdir, { recursive: true });
 
 let mod = await createEmerald();
-mod._Port_InitFlash(0);
+if (process.env.FLASH) {
+  mod.HEAPU8.set(fs.readFileSync(process.env.FLASH), mod._Port_GetFlash());
+  mod._Port_InitFlash(1);
+} else {
+  mod._Port_InitFlash(0);
+}
 let frame = 0;
 
 function run(n, keys = 0) {
@@ -113,6 +118,12 @@ function exec(line) {
       mod.HEAPU8.set(mem);
       break;
     }
+    case 'battle':
+      mod._Port_TestWildBattle(parseInt(parts[1]), parseInt(parts[2] || '5'));
+      break;
+    case 'dump':
+      mod._Port_DebugDump();
+      break;
     case 'savefile': {
       const ptr = mod._Port_GetFlash();
       fs.writeFileSync(parts[1], mod.HEAPU8.slice(ptr, ptr + mod._Port_GetFlashSize()));
